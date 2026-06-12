@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0805">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Focus Noir">
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+  <title>Focus Noir</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0a0805;
+      --surface:    #141008;
+      --gold:       #c9a84c;
+      --gold-lt:    #e5c86a;
+      --gold-dk:    #6a5525;
+      --cream:      #f0e4c4;
+      --text:       #cebb94;
+      --text-dim:   #6b5c3a;
+      --text-muted: #2e2818;
+    }
+
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Cinzel', Georgia, serif;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── OVERLAYS ── */
+    .grain-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
+
+    .vignette {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.72) 100%);
+      pointer-events: none; z-index: 2;
+    }
+
+    .spotlight {
+      position: fixed; width: 640px; height: 640px;
+      top: 50%; left: 50%; transform: translate(-50%, -58%);
+      background: radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 60%);
+      pointer-events: none; z-index: 1; transition: background 0.9s ease;
+    }
+    .spotlight.lit {
+      background: radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 60%);
+    }
+
+    /* ── APP ── */
+    #app {
+      position: relative; z-index: 10;
+      width: 400px; max-width: 100vw;
+      height: 100vh; max-height: 720px;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    .app-header { text-align: center; padding: 22px 0 16px; flex-shrink: 0; }
+    .app-title {
+      font-family: 'Cinzel Decorative', serif;
+      font-size: 13px; letter-spacing: 0.45em;
+      color: var(--gold-lt);
+      text-shadow: 0 0 30px rgba(201,168,76,0.22);
+    }
+    .header-rule {
+      margin-top: 14px; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold-dk) 20%, var(--gold) 50%, var(--gold-dk) 80%, transparent);
+    }
+
+    /* ── VIEWS ── */
+    .view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .view.active { display: flex; animation: fadein 0.22s ease; }
+    @keyframes fadein { from { opacity:0; } to { opacity:1; } }
+
+    /* ── TIMER VIEW ── */
+    #view-timer {
+      align-items: center; justify-content: center;
+      padding: 16px 28px 20px; gap: 26px;
+    }
+
+    /* ── ART DECO FRAME ── */
+    .timer-frame {
+      position: relative; width: 100%;
+      border: 1px solid var(--gold-dk); padding: 4px;
+      transition: box-shadow 1.5s ease;
+    }
+    .timer-frame.running {
+      box-shadow: 0 0 32px rgba(201,168,76,0.1), 0 0 70px rgba(201,168,76,0.04);
+    }
+    /* Diamond on top and bottom borders */
+    .timer-frame::before {
+      content: '◆';
+      position: absolute; top: 0; left: 50%;
+      transform: translate(-50%, -52%);
+      font-size: 10px; color: var(--gold);
+      background: var(--bg); padding: 0 7px; line-height: 1;
+    }
+    .timer-frame::after {
+      content: '◆';
+      position: absolute; bottom: 0; left: 50%;
+      transform: translate(-50%, 52%);
+      font-size: 10px; color: var(--gold-dk);
+      background: var(--bg); padding: 0 7px; line-height: 1;
+    }
+    .frame-inner {
+      border: 1px solid rgba(201,168,76,0.28);
+      padding: 26px 32px; text-align: center;
+      background: linear-gradient(180deg, rgba(201,168,76,0.045) 0%, transparent 45%);
+    }
+    /* Corner ornaments */
+    .corner {
+      position: absolute; color: var(--gold); font-size: 9px;
+      line-height: 1; background: var(--bg); padding: 1px 2px; z-index: 1;
+    }
+    .corner.tl { top:-1px; left:-1px; transform:translate(-50%,-50%); }
+    .corner.tr { top:-1px; right:-1px; transform:translate(50%,-50%); }
+    .corner.bl { bottom:-1px; left:-1px; transform:translate(-50%,50%); }
+    .corner.br { bottom:-1px; right:-1px; transform:translate(50%,50%); }
+
+    .mode-label {
+      font-size: 9px; letter-spacing: 0.42em;
+      color: var(--gold); font-weight: 600; margin-bottom: 14px;
+      transition: color 0.5s;
+    }
+    .mode-label.is-break { color: var(--gold-dk); }
+
+    .deco-rule { display:flex; align-items:center; gap:8px; margin:10px 0; }
+    .deco-rule .rl { flex:1; height:1px; }
+    .deco-rule .rl:first-child { background:linear-gradient(90deg,transparent,var(--gold-dk)); }
+    .deco-rule .rl:last-child  { background:linear-gradient(270deg,transparent,var(--gold-dk)); }
+    .deco-rule .rd { color:var(--gold-dk); font-size:7px; line-height:1; }
+
+    .timer-display {
+      font-family: 'Courier Prime', monospace;
+      font-size: 82px; font-weight: 700;
+      color: var(--cream); letter-spacing: 5px; line-height: 1;
+      text-shadow: 0 0 40px rgba(240,228,196,0.12), 0 2px 8px rgba(0,0,0,0.95);
+    }
+
+    .session-dots {
+      display:flex; gap:10px; align-items:center;
+      justify-content:center; margin-top:6px;
+    }
+    .sdot {
+      width:7px; height:7px; border-radius:50%;
+      border:1px solid var(--text-muted); background:transparent;
+      transition:all 0.35s ease;
+    }
+    .sdot.done   { background:var(--gold); border-color:var(--gold); box-shadow:0 0 6px rgba(201,168,76,0.5); }
+    .sdot.active { border-color:var(--gold-lt); box-shadow:0 0 5px rgba(229,200,106,0.3); }
+
+    /* ── CONTROLS ── */
+    .controls { display:flex; align-items:center; justify-content:center; gap:20px; }
+    .ctrl-btn {
+      background:transparent; border:1px solid var(--gold-dk);
+      color:var(--text-dim); font-family:'Cinzel',serif;
+      font-size:9px; letter-spacing:0.25em;
+      cursor:pointer; padding:9px 16px;
+      transition:all 0.2s; outline:none;
+    }
+    .ctrl-btn:hover { border-color:var(--gold); color:var(--gold-lt); }
+    .ctrl-btn.primary {
+      border-color:var(--gold); color:var(--gold-lt);
+      font-size:11px; letter-spacing:0.4em; padding:13px 40px; font-weight:600;
+      box-shadow:0 0 18px rgba(201,168,76,0.07), inset 0 0 18px rgba(201,168,76,0.03);
+    }
+    .ctrl-btn.primary:hover {
+      background:rgba(201,168,76,0.07);
+      box-shadow:0 0 30px rgba(201,168,76,0.18);
+    }
+    .ctrl-btn.icon { font-size:17px; padding:8px 14px; letter-spacing:0; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav { flex-shrink:0; display:flex; border-top:1px solid var(--gold-dk); }
+    .nav-btn {
+      flex:1; background:transparent; border:none;
+      border-right:1px solid var(--gold-dk);
+      color:var(--text-muted); font-family:'Cinzel',serif;
+      font-size:8px; letter-spacing:0.3em; padding:15px 0;
+      cursor:pointer; transition:all 0.2s; outline:none; font-weight:600;
+    }
+    .nav-btn:last-child { border-right:none; }
+    .nav-btn.active { color:var(--gold-lt); background:rgba(201,168,76,0.04); }
+    .nav-btn:hover:not(.active) { color:var(--text-dim); }
+
+    /* ── STATS ── */
+    #view-stats { overflow:hidden; }
+    .stats-scroll {
+      flex:1; overflow-y:auto; padding:16px 22px 24px;
+      scrollbar-width:thin; scrollbar-color:var(--gold-dk) transparent;
+    }
+    .stats-scroll::-webkit-scrollbar { width:3px; }
+    .stats-scroll::-webkit-scrollbar-thumb { background:var(--gold-dk); }
+    .section-title {
+      font-family:'Cinzel Decorative',serif; font-size:10px;
+      letter-spacing:0.35em; color:var(--gold-lt);
+      text-align:center; margin-bottom:16px;
+    }
+    .stats-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+    .stat-card {
+      border:1px solid var(--gold-dk); padding:12px 6px; text-align:center;
+      background:linear-gradient(180deg,rgba(201,168,76,0.03) 0%,transparent 100%);
+    }
+    .stat-label { font-size:7px; letter-spacing:0.28em; color:var(--text-dim); margin-bottom:6px; font-weight:600; }
+    .stat-value { font-family:'Courier Prime',monospace; font-size:17px; color:var(--cream); font-weight:700; }
+    .stats-highlights {
+      display:flex; align-items:center; justify-content:center;
+      gap:24px; margin:12px 0; padding:12px;
+      border-top:1px solid var(--text-muted); border-bottom:1px solid var(--text-muted);
+    }
+    .highlight { text-align:center; }
+    .hl-label { font-size:7px; letter-spacing:0.25em; color:var(--text-dim); margin-bottom:4px; font-weight:600; }
+    .hl-value { font-family:'Courier Prime',monospace; font-size:20px; color:var(--gold-lt); font-weight:700; }
+    .hdiv { color:var(--gold-dk); font-size:12px; }
+    .stats-tabs { display:flex; border:1px solid var(--gold-dk); margin-bottom:12px; }
+    .stab {
+      flex:1; background:transparent; border:none; border-right:1px solid var(--gold-dk);
+      color:var(--text-muted); font-family:'Cinzel',serif;
+      font-size:7px; letter-spacing:0.18em; padding:8px 0;
+      cursor:pointer; transition:all 0.2s; font-weight:600; outline:none;
+    }
+    .stab:last-child { border-right:none; }
+    .stab.active { color:var(--gold-lt); background:rgba(201,168,76,0.06); }
+    .stab:hover:not(.active) { color:var(--text-dim); }
+    .chart {
+      display:flex; align-items:flex-end; justify-content:space-around;
+      height:72px; border-bottom:1px solid var(--gold-dk);
+      padding-bottom:4px; margin-bottom:4px; gap:2px;
+    }
+    .chart-col { flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; }
+    .chart-bar-wrap { flex:1; display:flex; align-items:flex-end; width:100%; padding:0 1px; }
+    .chart-bar { width:100%; min-height:2px; background:var(--gold-dk); transition:height 0.4s ease; }
+    .chart-bar.hi { background:var(--gold); }
+    .chart-lbl { font-size:5px; letter-spacing:0.04em; color:var(--text-muted); margin-top:3px; font-weight:600; white-space:nowrap; }
+    .records-wrap { overflow:hidden; }
+    .records-table { width:100%; border-collapse:collapse; }
+    .records-table th {
+      letter-spacing:0.22em; font-size:7px; color:var(--text-dim);
+      padding:8px 4px; border-bottom:1px solid var(--gold-dk); font-weight:600; text-align:left;
+    }
+    .records-table td {
+      padding:7px 4px; border-bottom:1px solid var(--text-muted);
+      color:var(--text); font-family:'Courier Prime',monospace; font-size:11px;
+    }
+    .records-table tr:last-child td { border-bottom:none; }
+    .empty-row { color:var(--text-muted)!important; text-align:center!important; font-family:'Cinzel',serif!important; font-size:9px!important; padding:20px!important; }
+
+    /* ── SETTINGS ── */
+    #view-settings { overflow:hidden; }
+    .settings-scroll {
+      flex:1; overflow-y:auto; padding:16px 22px 24px;
+      scrollbar-width:thin; scrollbar-color:var(--gold-dk) transparent;
+    }
+    .settings-scroll::-webkit-scrollbar { width:3px; }
+    .settings-scroll::-webkit-scrollbar-thumb { background:var(--gold-dk); }
+    .settings-section { margin-bottom:18px; border:1px solid var(--gold-dk); }
+    .settings-hdr {
+      font-size:7px; letter-spacing:0.35em; color:var(--gold-dk);
+      padding:8px 12px; border-bottom:1px solid var(--gold-dk);
+      font-weight:600; background:rgba(201,168,76,0.025);
+    }
+    .setting-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 12px; border-bottom:1px solid var(--text-muted);
+    }
+    .setting-row:last-child { border-bottom:none; }
+    .s-label { font-size:9px; letter-spacing:0.12em; color:var(--text); flex:1; }
+    .num-ctrl { display:flex; align-items:center; gap:4px; }
+    .num-btn {
+      background:transparent; border:1px solid var(--gold-dk);
+      color:var(--gold-lt); font-size:15px; width:24px; height:24px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      padding:0; font-family:monospace; transition:all 0.15s; outline:none;
+    }
+    .num-btn:hover { border-color:var(--gold); background:rgba(201,168,76,0.08); }
+    .num-input {
+      background:transparent; border:1px solid var(--gold-dk);
+      color:var(--cream); font-family:'Courier Prime',monospace;
+      font-size:13px; width:42px; text-align:center; padding:2px;
+      outline:none; -moz-appearance:textfield;
+    }
+    .num-input::-webkit-inner-spin-button,
+    .num-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+    .num-unit { font-size:7px; letter-spacing:0.08em; color:var(--text-dim); min-width:32px; }
+    .toggle { position:relative; cursor:pointer; flex-shrink:0; }
+    .tog-inp { opacity:0; width:0; height:0; position:absolute; }
+    .tog-track {
+      display:block; width:36px; height:18px;
+      border:1px solid var(--gold-dk); background:transparent;
+      position:relative; transition:all 0.2s;
+    }
+    .tog-thumb {
+      position:absolute; top:2px; left:2px;
+      width:12px; height:12px; background:var(--text-muted);
+      transition:all 0.22s;
+    }
+    .tog-inp:checked + .tog-track { border-color:var(--gold); background:rgba(201,168,76,0.1); }
+    .tog-inp:checked + .tog-track .tog-thumb { transform:translateX(18px); background:var(--gold); box-shadow:0 0 8px rgba(201,168,76,0.4); }
+    .s-select {
+      background:var(--surface); border:1px solid var(--gold-dk);
+      color:var(--text); font-family:'Cinzel',serif;
+      font-size:8px; letter-spacing:0.08em; padding:5px 22px 5px 8px;
+      cursor:pointer; outline:none; -webkit-appearance:none; appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236a5525'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 6px center; background-size:7px;
+    }
+    .s-select option { background:#1a1610; }
+    .vol-wrap { display:flex; align-items:center; gap:8px; }
+    .s-range {
+      -webkit-appearance:none; appearance:none;
+      width:88px; height:2px; background:var(--text-muted);
+      outline:none; cursor:pointer;
+    }
+    .s-range::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; background:var(--gold); border:none; cursor:pointer; box-shadow:0 0 6px rgba(201,168,76,0.4); }
+    .s-range::-moz-range-thumb { width:12px; height:12px; background:var(--gold); border:none; cursor:pointer; }
+    .vol-val { font-family:'Courier Prime',monospace; font-size:10px; color:var(--text-dim); min-width:30px; }
+    .test-btn {
+      background:transparent; border:1px solid var(--gold-dk);
+      color:var(--gold-lt); font-family:'Cinzel',serif;
+      font-size:8px; letter-spacing:0.2em; padding:7px 14px;
+      cursor:pointer; transition:all 0.2s; outline:none;
+    }
+    .test-btn:hover { border-color:var(--gold); background:rgba(201,168,76,0.06); }
+  </style>
+</head>
+<body>
+
+<!-- Film grain -->
+<svg class="grain-overlay" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <filter id="fn-g" x="0%" y="0%" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/>
+    <feBlend in="SourceGraphic" mode="multiply"/>
+  </filter>
+  <rect width="100%" height="100%" filter="url(#fn-g)" opacity="0.055"/>
+</svg>
+
+<div class="vignette"></div>
+<div class="spotlight" id="spotlight"></div>
+
+<div id="app">
+  <header class="app-header">
+    <div class="app-title">◆ Focus Noir ◆</div>
+    <div class="header-rule"></div>
+  </header>
+
+  <!-- TIMER -->
+  <div id="view-timer" class="view active">
+    <div class="timer-frame" id="timer-frame" data-mode="pomodoro">
+      <span class="corner tl">◆</span>
+      <span class="corner tr">◆</span>
+      <span class="corner bl">◆</span>
+      <span class="corner br">◆</span>
+      <div class="frame-inner">
+        <div class="mode-label" id="mode-label">FOCUS SESSION</div>
+        <div class="deco-rule"><span class="rl"></span><span class="rd">◆</span><span class="rl"></span></div>
+        <div class="timer-display" id="timer-display">25:00</div>
+        <div class="deco-rule"><span class="rl"></span><span class="rd">◆</span><span class="rl"></span></div>
+        <div class="session-dots" id="session-dots"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="ctrl-btn icon" id="btn-reset" title="Reset">↺</button>
+      <button class="ctrl-btn primary" id="btn-start">START</button>
+      <button class="ctrl-btn icon" id="btn-skip" title="Skip">⟫</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div id="view-stats" class="view"></div>
+
+  <!-- SETTINGS -->
+  <div id="view-settings" class="view"></div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="timer">TIMER</button>
+    <button class="nav-btn" data-view="stats">STATS</button>
+    <button class="nav-btn" data-view="settings">SETTINGS</button>
+  </nav>
+</div>
+
+<script>
+'use strict';
+
+/* ── CONSTANTS ── */
+const DEFAULTS = {
+  pomodoroLength:25, shortBreakLength:5, longBreakLength:15,
+  longBreakInterval:4, autoStartBreak:false, autoStartPomodoro:false,
+  disableBreak:false, volume:0.7,
+  pomodoroEndSound:'vintageBell', breakEndSound:'softChime'
+};
+const MODE_LABELS = {
+  pomodoro:'FOCUS SESSION', shortBreak:'SHORT BREAK', longBreak:'LONG RECESS'
+};
+const SOUNDS = {
+  vintageBell:'Vintage Bell', typewriter:'Typewriter',
+  softChime:'Soft Chime',    jazzSting:'Jazz Sting',
+  clockTower:'Clock Tower',  digitalBeep:'Digital Beep'
+};
+
+/* ── STATE ── */
+let cfg = {...DEFAULTS};
+let mode = 'pomodoro', status = 'idle';
+let endTime = null, pausedMs = null;
+let sessionCount = 0, statsTab = 'daily';
+let audioCtx = null, records = [];
+
+/* ── PERSISTENCE ── */
+const save = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
+const load = k => { try { const s=localStorage.getItem(k); return s?JSON.parse(s):null; } catch(e){return null;} };
+function loadAll() {
+  const s=load('fn_cfg'); if(s) cfg={...DEFAULTS,...s};
+  records=load('fn_recs')||[];
+}
+
+/* ── WEB WORKER ── accurate tick, immune to tab throttle ── */
+const worker = new Worker(URL.createObjectURL(new Blob([
+  `let iv; onmessage=e=>{ if(e.data==='start'){clearInterval(iv);iv=setInterval(()=>postMessage('t'),250);}else clearInterval(iv); };`
+], {type:'application/javascript'})));
+worker.onmessage = () => tick();
+
+/* ── TIMER LOGIC ── */
+const getModeMs = () => {
+  if(mode==='pomodoro')   return cfg.pomodoroLength*60000;
+  if(mode==='shortBreak') return cfg.shortBreakLength*60000;
+  return cfg.longBreakLength*60000;
+};
+const getRemMs = () => {
+  if(status==='idle')   return getModeMs();
+  if(status==='paused') return pausedMs;
+  return Math.max(0, endTime - Date.now());
+};
+
+function startTimer() {
+  endTime = Date.now() + (status==='paused' ? pausedMs : getModeMs());
+  pausedMs=null; status='running';
+  worker.postMessage('start');
+  $('spotlight').classList.add('lit');
+  renderControls();
+}
+function pauseTimer() {
+  pausedMs=Math.max(0, endTime-Date.now());
+  endTime=null; status='paused';
+  worker.postMessage('stop');
+  $('spotlight').classList.remove('lit');
+  renderControls();
+}
+function resetTimer() {
+  status='idle'; endTime=null; pausedMs=null;
+  worker.postMessage('stop');
+  $('spotlight').classList.remove('lit');
+  renderDisplay(); renderControls();
+}
+function skipSession() {
+  worker.postMessage('stop');
+  status='idle'; endTime=null; pausedMs=null;
+  mode = mode==='pomodoro' ? (cfg.disableBreak?'pomodoro':'shortBreak') : 'pomodoro';
+  $('spotlight').classList.remove('lit');
+  renderMode(); renderDisplay(); renderControls(); renderDots();
+}
+
+function tick() {
+  renderDisplay();
+  if(status==='running' && Date.now()>=endTime) onComplete();
+}
+
+function onComplete() {
+  worker.postMessage('stop');
+  status='idle';
+  playSound(mode==='pomodoro' ? cfg.pomodoroEndSound : cfg.breakEndSound);
+  pushNotify(mode);
+  if(mode==='pomodoro') {
+    addRecord(cfg.pomodoroLength*60);
+    sessionCount++;
+    if(!cfg.disableBreak)
+      mode = sessionCount%cfg.longBreakInterval===0 ? 'longBreak' : 'shortBreak';
+  } else {
+    mode='pomodoro';
+  }
+  $('spotlight').classList.remove('lit');
+  renderMode(); renderDisplay(); renderControls(); renderDots();
+  const isBreak = mode!=='pomodoro';
+  if(isBreak  && cfg.autoStartBreak)     setTimeout(startTimer,700);
+  if(!isBreak && cfg.autoStartPomodoro)  setTimeout(startTimer,700);
+}
+
+/* ── AUDIO ENGINE ── */
+function getCtx() {
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playSound(key) {
+  const ctx=getCtx(), t=ctx.currentTime, v=cfg.volume;
+  /* helper: simple oscillator with exponential decay */
+  const osc=(type,freq,gain,dur,dt=t)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(gain,dt); g.gain.exponentialRampToValueAtTime(0.001,dt+dur);
+    o.connect(g); g.connect(ctx.destination); o.start(dt); o.stop(dt+dur+0.05);
+  };
+  const fns={
+    vintageBell(){
+      /* Resonant bell: A5 fundamental + harmonics */
+      osc('sine',880,v*0.70,2.5); osc('sine',1760,v*0.25,1.2); osc('sine',440,v*0.20,1.8);
+    },
+    typewriter(){
+      /* Metallic ding: pitch sweep + click */
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='triangle';
+      o.frequency.setValueAtTime(2000,t); o.frequency.exponentialRampToValueAtTime(900,t+0.25);
+      g.gain.setValueAtTime(v*0.85,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.45);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+0.5);
+      osc('square',400,v*0.25,0.04);
+    },
+    softChime(){
+      /* Ascending C-major: C5 E5 G5 C6 */
+      [523.25,659.25,783.99,1046.5].forEach((f,i)=>{
+        const dt=t+i*0.13,o=ctx.createOscillator(),g=ctx.createGain();
+        o.type='sine'; o.frequency.value=f;
+        g.gain.setValueAtTime(0,dt); g.gain.linearRampToValueAtTime(v*0.45,dt+0.02);
+        g.gain.exponentialRampToValueAtTime(0.001,dt+1.0);
+        o.connect(g); g.connect(ctx.destination); o.start(dt); o.stop(dt+1.1);
+      });
+    },
+    jazzSting(){
+      /* Muted brass descent: Bb4 Db5 F4 */
+      [[466.16,0],[554.37,0.17],[349.23,0.34]].forEach(([f,d])=>{
+        const dt=t+d, o=ctx.createOscillator(), fi=ctx.createBiquadFilter(), g=ctx.createGain();
+        o.type='sawtooth'; o.frequency.value=f;
+        fi.type='lowpass'; fi.frequency.value=1100; fi.Q.value=0.8;
+        g.gain.setValueAtTime(0,dt); g.gain.linearRampToValueAtTime(v*0.38,dt+0.025);
+        g.gain.exponentialRampToValueAtTime(0.001,dt+0.55);
+        o.connect(fi); fi.connect(g); g.connect(ctx.destination); o.start(dt); o.stop(dt+0.6);
+      });
+    },
+    clockTower(){
+      /* Two deep tolls: A3 + E4 harmonic */
+      [0,0.88].forEach(d=>{ osc('sine',220,v*0.65,2.8,t+d); osc('sine',330,v*0.22,1.6,t+d); });
+    },
+    digitalBeep(){
+      /* Clean square pulse */
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='square'; o.frequency.value=880;
+      g.gain.setValueAtTime(v*0.22,t); g.gain.setValueAtTime(v*0.22,t+0.08);
+      g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+0.16);
+    }
+  };
+  (fns[key]||fns.vintageBell)();
+}
+
+/* ── STATISTICS ── */
+function addRecord(dur) { records.push({ts:Date.now(),dur}); save('fn_recs',records); }
+
+function filterRecs(period) {
+  const now=new Date();
+  return records.filter(r=>{
+    const d=new Date(r.ts);
+    if(period==='today') return d.toDateString()===now.toDateString();
+    if(period==='week'){
+      const s=new Date(now); s.setDate(now.getDate()-((now.getDay()||7)-1)); s.setHours(0,0,0,0);
+      return d>=s;
+    }
+    if(period==='month') return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
+    if(period==='year')  return d.getFullYear()===now.getFullYear();
+    return true;
+  });
+}
+const totalSecs = recs => recs.reduce((s,r)=>s+r.dur,0);
+function byDay(recs) {
+  const m={};
+  recs.forEach(r=>{ const k=new Date(r.ts).toISOString().slice(0,10); m[k]=(m[k]||0)+r.dur; });
+  return m;
+}
+const highestDay = ()=>{ const v=Object.values(byDay(records)); return v.length?Math.max(...v):0; };
+const avgDay     = ()=>{ const v=Object.values(byDay(records)); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
+
+function fmtSecs(s) {
+  if(!s) return '—';
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+  return h>0?`${h}h ${m}m`:`${m}m`;
+}
+
+/* ── NOTIFICATIONS ── */
+function pushNotify(completedMode) {
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  const body=completedMode==='pomodoro'?'Session complete. Time for a break.':'Break over. Return to work.';
+  const opts={body,icon:'icon.svg'};
+  /* ServiceWorker showNotification is required for reliable delivery
+     in PWA / service-worker-controlled contexts.
+     new Notification() alone is silently dropped by Chrome in those cases. */
+  if('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then(reg=>reg.showNotification('Focus Noir',opts))
+      .catch(()=>{ try{new Notification('Focus Noir',opts);}catch(e){} });
+  } else {
+    try{new Notification('Focus Noir',opts);}catch(e){}
+  }
+}
+
+/* ── RENDER: TIMER ── */
+const $ = id=>document.getElementById(id);
+
+function renderDisplay() {
+  const ms=getRemMs();
+  const mm=String(Math.floor(ms/60000)).padStart(2,'0');
+  const ss=String(Math.floor((ms%60000)/1000)).padStart(2,'0');
+  const str=`${mm}:${ss}`;
+  $('timer-display').textContent=str;
+  document.title=status==='running'?`${str} — Focus Noir`:'Focus Noir';
+}
+function renderMode() {
+  $('mode-label').textContent=MODE_LABELS[mode];
+  $('mode-label').classList.toggle('is-break', mode!=='pomodoro');
+  $('timer-frame').dataset.mode=mode;
+}
+function renderControls() {
+  $('btn-start').textContent=status==='running'?'PAUSE':status==='paused'?'RESUME':'START';
+  $('timer-frame').classList.toggle('running', status==='running');
+}
+function renderDots() {
+  const n=cfg.longBreakInterval;
+  const done=mode==='longBreak'?n:sessionCount%n;
+  const inProg=status==='running'&&mode==='pomodoro';
+  $('session-dots').innerHTML=Array.from({length:n},(_,i)=>{
+    const c=i<done?'done':i===done&&inProg?'active':'';
+    return `<div class="sdot${c?' '+c:''}"></div>`;
+  }).join('');
+}
+
+/* ── RENDER: STATS ── */
+function renderStats() {
+  const view=$('view-stats');
+  const now=new Date();
+  const today=totalSecs(filterRecs('today')),week=totalSecs(filterRecs('week')),all=totalSecs(records);
+
+  let data=[],labels=[];
+  if(statsTab==='daily'){
+    const dm=byDay(records);
+    for(let i=6;i>=0;i--){
+      const d=new Date(now); d.setDate(now.getDate()-i);
+      const k=d.toISOString().slice(0,10);
+      data.push({val:dm[k]||0,hi:d.toDateString()===now.toDateString()});
+      labels.push(d.toLocaleDateString('en',{weekday:'short'}).toUpperCase().slice(0,3));
+    }
+  } else if(statsTab==='weekly'){
+    for(let i=7;i>=0;i--){
+      const s=new Date(now); s.setDate(now.getDate()-((now.getDay()||7)-1)-i*7); s.setHours(0,0,0,0);
+      const e2=new Date(s); e2.setDate(s.getDate()+7);
+      const wr=records.filter(r=>{const d=new Date(r.ts);return d>=s&&d<e2;});
+      data.push({val:totalSecs(wr),hi:i===0});
+      labels.push(s.toLocaleDateString('en',{month:'short'}).toUpperCase()+' '+s.getDate());
+    }
+  } else if(statsTab==='monthly'){
+    for(let i=11;i>=0;i--){
+      const d=new Date(now); d.setMonth(now.getMonth()-i);
+      const mr=records.filter(r=>{const rd=new Date(r.ts);return rd.getFullYear()===d.getFullYear()&&rd.getMonth()===d.getMonth();});
+      data.push({val:totalSecs(mr),hi:i===0});
+      labels.push(d.toLocaleDateString('en',{month:'short'}).toUpperCase());
+    }
+  } else {
+    const yrs=[...new Set(records.map(r=>new Date(r.ts).getFullYear()))].sort();
+    if(!yrs.length) yrs.push(now.getFullYear());
+    yrs.forEach(yr=>{
+      data.push({val:totalSecs(records.filter(r=>new Date(r.ts).getFullYear()===yr)),hi:yr===now.getFullYear()});
+      labels.push(String(yr));
+    });
+  }
+
+  const mx=Math.max(...data.map(d=>d.val),1);
+  const bars=data.map((d,i)=>`
+    <div class="chart-col">
+      <div class="chart-bar-wrap">
+        <div class="chart-bar${d.hi?' hi':''}" style="height:${Math.max(2,Math.round(d.val/mx*100))}%"></div>
+      </div>
+      <div class="chart-lbl">${labels[i]}</div>
+    </div>`).join('');
+
+  const rows=records.length
+    ?[...records].reverse().slice(0,100).map(r=>{
+        const d=new Date(r.ts);
+        const ds=d.toLocaleDateString('en',{month:'short',day:'numeric'}).toUpperCase();
+        const ts2=d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit',hour12:false});
+        return `<tr><td>${ds}</td><td>${ts2}</td><td>${fmtSecs(r.dur)}</td></tr>`;
+      }).join('')
+    :`<tr><td colspan="3" class="empty-row">No sessions recorded yet.</td></tr>`;
+
+  view.innerHTML=`<div class="stats-scroll">
+    <div class="section-title">◆ STATISTICS ◆</div>
+    <div class="stats-summary">
+      <div class="stat-card"><div class="stat-label">TODAY</div><div class="stat-value">${fmtSecs(today)}</div></div>
+      <div class="stat-card"><div class="stat-label">THIS WEEK</div><div class="stat-value">${fmtSecs(week)}</div></div>
+      <div class="stat-card"><div class="stat-label">TOTAL</div><div class="stat-value">${fmtSecs(all)}</div></div>
+    </div>
+    <div class="stats-highlights">
+      <div class="highlight"><div class="hl-label">BEST DAY</div><div class="hl-value">${fmtSecs(highestDay())}</div></div>
+      <div class="hdiv">◆</div>
+      <div class="highlight"><div class="hl-label">DAILY AVG</div><div class="hl-value">${fmtSecs(Math.round(avgDay()))}</div></div>
+    </div>
+    <div class="stats-tabs">${['daily','weekly','monthly','yearly'].map(tab=>`
+      <button class="stab${statsTab===tab?' active':''}" data-tab="${tab}">${tab.toUpperCase()}</button>`).join('')}
+    </div>
+    <div class="chart">${bars}</div>
+    <div class="section-title" style="margin-top:18px">◆ RECORDS ◆</div>
+    <div class="records-wrap">
+      <table class="records-table">
+        <thead><tr><th>DATE</th><th>START</th><th>DURATION</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  view.querySelectorAll('.stab').forEach(b=>b.addEventListener('click',()=>{ statsTab=b.dataset.tab; renderStats(); }));
+}
+
+/* ── RENDER: SETTINGS ── */
+function renderSettings() {
+  const view=$('view-settings');
+  const numRow=(key,lbl,min,max,unit='min')=>`
+    <div class="setting-row"><span class="s-label">${lbl}</span>
+    <div class="num-ctrl">
+      <button class="num-btn" data-key="${key}" data-d="-1">−</button>
+      <input class="num-input" type="number" data-key="${key}" value="${cfg[key]}" min="${min}" max="${max}">
+      <button class="num-btn" data-key="${key}" data-d="1">+</button>
+      <span class="num-unit">${unit}</span>
+    </div></div>`;
+  const togRow=(key,lbl)=>`
+    <div class="setting-row"><span class="s-label">${lbl}</span>
+    <label class="toggle">
+      <input class="tog-inp" type="checkbox" data-key="${key}"${cfg[key]?' checked':''}>
+      <span class="tog-track"><span class="tog-thumb"></span></span>
+    </label></div>`;
+  const selRow=(key,lbl)=>`
+    <div class="setting-row"><span class="s-label">${lbl}</span>
+    <select class="s-select" data-key="${key}">${
+      Object.entries(SOUNDS).map(([k,v])=>`<option value="${k}"${cfg[key]===k?' selected':''}>${v}</option>`).join('')
+    }</select></div>`;
+
+  view.innerHTML=`<div class="settings-scroll">
+    <div class="section-title">◆ SETTINGS ◆</div>
+    <div class="settings-section">
+      <div class="settings-hdr">TIMER</div>
+      ${numRow('pomodoroLength','Pomodoro',1,90)}
+      ${numRow('shortBreakLength','Short Break',1,60)}
+      ${numRow('longBreakLength','Long Break',1,120)}
+      ${numRow('longBreakInterval','Long Break Every',1,10,'sessions')}
+    </div>
+    <div class="settings-section">
+      <div class="settings-hdr">BEHAVIOUR</div>
+      ${togRow('autoStartBreak','Auto-start Break')}
+      ${togRow('autoStartPomodoro','Auto-start Pomodoro')}
+      ${togRow('disableBreak','Disable Breaks')}
+    </div>
+    <div class="settings-section">
+      <div class="settings-hdr">SOUND</div>
+      ${selRow('pomodoroEndSound','Pomodoro End')}
+      ${selRow('breakEndSound','Break End')}
+      <div class="setting-row"><span class="s-label">Volume</span>
+        <div class="vol-wrap">
+          <input class="s-range" type="range" id="vol-range" min="0" max="1" step="0.05" value="${cfg.volume}">
+          <span class="vol-val" id="vol-val">${Math.round(cfg.volume*100)}%</span>
+        </div>
+      </div>
+      <div class="setting-row"><span class="s-label"></span>
+        <button class="test-btn" id="test-btn">▶ TEST SOUND</button>
+      </div>
+    </div>
+  </div>`;
+
+  view.querySelectorAll('.num-btn').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.key, d=parseInt(b.dataset.d);
+    const inp=view.querySelector(`.num-input[data-key="${k}"]`);
+    cfg[k]=Math.min(parseInt(inp.max),Math.max(parseInt(inp.min),cfg[k]+d));
+    inp.value=cfg[k]; save('fn_cfg',cfg); if(status==='idle') renderDisplay();
+  }));
+  view.querySelectorAll('.num-input').forEach(inp=>inp.addEventListener('change',()=>{
+    const k=inp.dataset.key;
+    cfg[k]=Math.min(parseInt(inp.max),Math.max(parseInt(inp.min),parseInt(inp.value)||DEFAULTS[k]));
+    inp.value=cfg[k]; save('fn_cfg',cfg); if(status==='idle') renderDisplay();
+  }));
+  view.querySelectorAll('.tog-inp').forEach(inp=>inp.addEventListener('change',()=>{ cfg[inp.dataset.key]=inp.checked; save('fn_cfg',cfg); }));
+  view.querySelectorAll('.s-select').forEach(sel=>sel.addEventListener('change',()=>{ cfg[sel.dataset.key]=sel.value; save('fn_cfg',cfg); }));
+  const vr=$('vol-range'),vv=$('vol-val');
+  vr.addEventListener('input',()=>{ cfg.volume=parseFloat(vr.value); vv.textContent=`${Math.round(cfg.volume*100)}%`; save('fn_cfg',cfg); });
+  $('test-btn').addEventListener('click',()=>playSound(cfg.pomodoroEndSound));
+}
+
+/* ── VIEW SWITCHING ── */
+function switchView(v) {
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
+  $(`view-${v}`).classList.add('active');
+  document.querySelector(`.nav-btn[data-view="${v}"]`).classList.add('active');
+  if(v==='stats')    renderStats();
+  if(v==='settings') renderSettings();
+}
+
+/* ── EVENTS ── */
+$('btn-start').addEventListener('click',()=>{
+  if(status==='running') pauseTimer(); else startTimer();
+  if('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+});
+$('btn-reset').addEventListener('click', resetTimer);
+$('btn-skip').addEventListener('click',  skipSession);
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+
+/* ── INIT ── */
+loadAll();
+renderMode();
+renderDisplay();
+renderControls();
+renderDots();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

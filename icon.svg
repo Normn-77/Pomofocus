@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0a0805"/>
+
+  <!-- Outer frame -->
+  <rect x="32" y="32" width="448" height="448" fill="none" stroke="#6a5525" stroke-width="4"/>
+  <!-- Inner frame -->
+  <rect x="46" y="46" width="420" height="420" fill="none" stroke="#c9a84c" stroke-width="1.5" opacity="0.45"/>
+
+  <!-- Corner ornaments -->
+  <polygon points="32,32 68,32 32,68"   fill="#6a5525" opacity="0.7"/>
+  <polygon points="480,32 444,32 480,68"  fill="#6a5525" opacity="0.7"/>
+  <polygon points="32,480 68,480 32,444"  fill="#6a5525" opacity="0.7"/>
+  <polygon points="480,480 444,480 480,444" fill="#6a5525" opacity="0.7"/>
+
+  <!-- Horizontal decorative rules -->
+  <line x1="80" y1="180" x2="432" y2="180" stroke="#6a5525" stroke-width="1" opacity="0.5"/>
+  <line x1="80" y1="332" x2="432" y2="332" stroke="#6a5525" stroke-width="1" opacity="0.5"/>
+
+  <!-- Subtle radial glow behind diamond -->
+  <radialGradient id="glow" cx="50%" cy="50%" r="40%">
+    <stop offset="0%"   stop-color="#c9a84c" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
+  </radialGradient>
+  <rect x="32" y="32" width="448" height="448" fill="url(#glow)"/>
+
+  <!-- Main diamond -->
+  <polygon points="256,128 368,256 256,384 144,256"
+    fill="#c9a84c" opacity="0.92"/>
+
+  <!-- Inner diamond highlight -->
+  <polygon points="256,165 338,256 256,347 174,256"
+    fill="#0a0805" opacity="0.55"/>
+
+  <!-- Center point -->
+  <circle cx="256" cy="256" r="18" fill="#e5c86a" opacity="0.9"/>
+  <circle cx="256" cy="256" r="8"  fill="#0a0805"/>
+</svg>
