@@ -2,7 +2,7 @@
   "name": "Focus Noir",
   "short_name": "Focus Noir",
   "description": "Art Deco Pomodoro Timer",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0a0805",
   "theme_color": "#0a0805",
